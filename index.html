@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MazeQuest</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,7 +44,7 @@
             <div class="card c-start">
                 <div class="icon-btn">🟢</div>
                 <h3>Start</h3>
-                <p>Touch START with index finger to draw</p>
+                <p>Touch START with index finger</p>
             </div>
             <div class="card c-move">
                 <div class="icon-btn">👆</div>
@@ -65,8 +65,8 @@
 
         <div class="camera-notice">
             <strong>📷 Camera Access Needed</strong><br>
-            MazeQuest uses your camera to see your hand movements. When you click <strong>Start Playing</strong>, your browser will ask for camera permission — just click <strong>Allow!</strong><br>
-            🔒 Your camera video never leaves your device.
+            MazeQuest needs your camera to track your hand. Tap <strong>Start Playing</strong> and hit <strong>Allow</strong> when prompted.<br>
+            🔒 Your camera feed stays local on your phone.
         </div>
 
         <button class="start-btn" onclick="startGame()">🚀 Start Playing!</button>
@@ -79,7 +79,7 @@
             <button class="reset-btn" onclick="resetGame()">🔄 Try Again</button>
         </div>
         <div class="canvas-wrapper">
-            <video id="input-video" playsinline></video>
+            <video id="input-video" autoplay playsinline webkit-playsinline muted style="display:none;"></video>
             <canvas id="game-canvas" width="1000" height="750"></canvas>
         </div>
     </div>
