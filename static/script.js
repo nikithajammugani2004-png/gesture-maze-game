@@ -21,14 +21,13 @@ let audioCtx = null;
 let startTime = 0;
 let elapsedTime = 0;
 
-let selectedImagePath = "static/images/moon.png";
+let selectedImagePath = "/static/images/moon.png";
 let mazeImg = new Image();
 let isImageLoaded = false;
 
-function selectLevel(element, imagePath) {
+function selectLevel(element) {
     document.querySelectorAll('.level-badge').forEach(badge => badge.classList.remove('active'));
     element.classList.add('active');
-    selectedImagePath = imagePath;
     loadSelectedMazeImage();
 }
 
@@ -59,32 +58,69 @@ function playSound(type) {
     }
 }
 
-function loadSelectedMazeImage() {
-    isImageLoaded = false;
-    mazeImg = new Image();
-    mazeImg.crossOrigin = "anonymous";
-    mazeImg.onload = () => {
-        offCtx.clearRect(0, 0, 1000, 750);
-        
-        // Draw the selected PNG centered on the collision canvas
-        const aspect = mazeImg.width / mazeImg.height;
-        let drawW = 650;
-        let drawH = drawW / aspect;
-        if (drawH > 600) {
-            drawH = 600;
-            drawW = drawH * aspect;
-        }
-        const drawX = (1000 - drawW) / 2;
-        const drawY = (750 - drawH) / 2;
+function generateRandomMaze(rows, cols) {
+    const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({
+        visited: false,
+        walls: { top: true, right: true, bottom: true, left: true }
+    })));
 
-        offCtx.drawImage(mazeImg, drawX, drawY, drawW, drawH);
-        isImageLoaded = true;
-    };
-    mazeImg.src = selectedImagePath;
+    function visit(r, c) {
+        grid[r][c].visited = true;
+        const neighbors = [
+            [r - 1, c, 'top', 'bottom'],
+            [r + 1, c, 'bottom', 'top'],
+            [r, c - 1, 'left', 'right'],
+            [r, c + 1, 'right', 'left']
+        ].sort(() => Math.random() - 0.5);
+
+        for (const [nr, nc, dir, opp] of neighbors) {
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !grid[nr][nc].visited) {
+                grid[r][c].walls[dir] = false;
+                grid[nr][nc].walls[opp] = false;
+                visit(nr, nc);
+            }
+        }
+    }
+
+    visit(0, 0);
+    return grid;
 }
 
-// Initial image load
-loadSelectedMazeImage();
+function loadSelectedMazeImage() {
+    isImageLoaded = false;
+    offCtx.clearRect(0, 0, 1000, 750);
+
+    const rows = 10;
+    const cols = 12;
+    const startX = 100;
+    const startY = 75;
+    const width = 800;
+    const height = 600;
+    const cellW = width / cols;
+    const cellH = height / rows;
+
+    const maze = generateRandomMaze(rows, cols);
+
+    offCtx.strokeStyle = "#000000";
+    offCtx.lineWidth = 12;
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const x = startX + c * cellW;
+            const y = startY + r * cellH;
+            const cell = maze[r][c];
+
+            offCtx.beginPath();
+            if (cell.walls.top) { offCtx.moveTo(x, y); offCtx.lineTo(x + cellW, y); }
+            if (cell.walls.right) { offCtx.moveTo(x + cellW, y); offCtx.lineTo(x + cellW, y + cellH); }
+            if (cell.walls.bottom) { offCtx.moveTo(x, y + cellH); offCtx.lineTo(x + cellW, y + cellH); }
+            if (cell.walls.left) { offCtx.moveTo(x, y); offCtx.lineTo(x, y + cellH); }
+            offCtx.stroke();
+        }
+    }
+
+    isImageLoaded = true;
+}
 
 function startGame() {
     document.getElementById('home-screen').style.display = 'none';
@@ -100,9 +136,9 @@ function startGame() {
 
         hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 0, // 0 runs smooth and fast on mobile
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
         });
 
         hands.onResults(onResults);
@@ -111,8 +147,8 @@ function startGame() {
             onFrame: async () => {
                 await hands.send({ image: videoElement });
             },
-            width: 640,
-            height: 480
+            width: 1000,
+            height: 750
         });
         camera.start();
     }
@@ -126,6 +162,9 @@ function resetGame() {
     startTime = Date.now();
     elapsedTime = 0;
     document.getElementById('timer-display').innerText = "⏱️ Time: 0.0s";
+    
+    // Generate a fresh random layout on reset
+    loadSelectedMazeImage();
 }
 
 function goHome() {
@@ -142,13 +181,12 @@ function checkCollision(pt) {
     if (px < 0 || px >= 1000 || py < 0 || py >= 750) return false;
     
     const pixel = offCtx.getImageData(px, py, 1, 1).data;
-    // Black maze lines check (R, G, B low and not transparent)
     return (pixel[0] < 80 && pixel[1] < 80 && pixel[2] < 80 && pixel[3] > 100);
 }
 
 function checkWin(pt) {
     if (!pt) return false;
-    return (pt.x > 840 && pt.y < 160);
+    return (pt.x > 840 && pt.y < 140);
 }
 
 function onResults(results) {
@@ -160,24 +198,22 @@ function onResults(results) {
         document.getElementById('timer-display').innerText = `⏱️ Time: ${elapsedTime}s`;
     }
 
-    // 1. Draw Camera Video (Mirrored)
+    // 1. Draw Video
     ctx.scale(-1, 1);
     ctx.translate(-canvas.width, 0);
     ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // 2. Dim background so maze lines pop
-    ctx.fillStyle = "rgba(5, 7, 13, 0.45)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 3. Draw The Actual Selected Maze Image
+    // 2. Draw Glowing Walls Only
     if (isImageLoaded) {
         ctx.save();
+        ctx.shadowColor = "#00FFFF";
+        ctx.shadowBlur = 15;
         ctx.drawImage(offCanvas, 0, 0);
         ctx.restore();
     }
 
-    // 4. Start & End Zone Markers
+    // 3. Clear Start & End Zone Markers (Top Corners)
     ctx.save();
     ctx.fillStyle = "#00FF66";
     ctx.shadowColor = "#00FF66";
@@ -200,7 +236,7 @@ function onResults(results) {
     ctx.fillText("END 🏁", 852, 114);
     ctx.restore();
 
-    // 5. Tracking & Smoothing
+    // 4. Tracking & Smoothing
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
         const indexTip = landmarks[8];
@@ -239,21 +275,21 @@ function onResults(results) {
             isDrawing = false;
         }
 
-        ctx.fillStyle = isDrawing ? "#00FF00" : "#00f0ff";
+        ctx.fillStyle = isDrawing ? "#00FF00" : "#FFA500";
         ctx.beginPath();
-        ctx.arc(fingerTip.x, fingerTip.y, 10, 0, 2 * Math.PI);
+        ctx.arc(fingerTip.x, fingerTip.y, 8, 0, 2 * Math.PI);
         ctx.fill();
     } else {
         smoothPos = null;
     }
 
-    // 6. Draw Player Drawing Path
+    // 5. Draw Neon Player Path
     if (pathPoints.length > 1) {
         ctx.save();
-        ctx.strokeStyle = "#00f0ff";
-        ctx.shadowColor = "#00f0ff";
+        ctx.strokeStyle = "#FF0055";
+        ctx.shadowColor = "#FF0055";
         ctx.shadowBlur = 10;
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
         for (let i = 1; i < pathPoints.length; i++) {
@@ -263,22 +299,22 @@ function onResults(results) {
         ctx.restore();
     }
 
-    // 7. Popups
+    // 6. Popups
     if (gameOver) {
-        ctx.fillStyle = "rgba(255, 0, 0, 0.65)";
+        ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#FFFFFF";
         ctx.font = "bold 36px Arial";
-        ctx.fillText("WALL HIT!", 380, 360);
+        ctx.fillText("WALL HIT!", 320, 280);
         ctx.font = "20px Arial";
-        ctx.fillText("Tap 'Try Again' above to retry", 350, 410);
+        ctx.fillText("Click 'Try Again' above to restart", 260, 330);
     } else if (gameWon) {
         ctx.fillStyle = "rgba(0, 255, 100, 0.7)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#FFFFFF";
         ctx.font = "bold 42px Arial";
-        ctx.fillText("GAME COMPLETED!", 300, 360);
+        ctx.fillText("GAME COMPLETED!", 210, 260);
         ctx.font = "24px Arial";
-        ctx.fillText(`Clean Run! Time: ${elapsedTime}s 🎉`, 340, 410);
+        ctx.fillText(`Clean Run! Time: ${elapsedTime}s 🎉`, 270, 310);
     }
 }
