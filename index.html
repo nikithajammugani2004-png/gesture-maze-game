@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MazeQuest</title>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-    <!-- Link external CSS -->
     <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
@@ -24,50 +22,48 @@
     </div>
 
     <div class="main-card" id="home-screen">
-        <div class="main-logo">🌀</div>
-        <h1>Maze<span>Quest</span></h1>
-        <p class="subtitle">Navigate the maze with your <strong>hands</strong>! Wave to move — no keyboard needed! 👋</p>
+        <div>
+            <div class="main-logo">🌀</div>
+            <h1>Maze<span>Quest</span></h1>
+            <p class="subtitle">Navigate the maze with your <strong>hands</strong>! Wave to move 👋</p>
 
-        <div class="levels">
-            <button class="level-badge l1 active" onclick="selectLevel(this, 'static/images/moon.png')">Moon 🌙</button>
-            <button class="level-badge l2" onclick="selectLevel(this, 'static/images/umbrella.png')">Umbrella ☂️</button>
-            <button class="level-badge l3" onclick="selectLevel(this, 'static/images/square.png')">Square 🔲</button>
-            <button class="level-badge l4" onclick="selectLevel(this, 'static/images/star.png')">Star ⭐</button>
-            <button class="level-badge l5" onclick="selectLevel(this, 'static/images/egg.png')">Egg 🥚</button>
-            <button class="level-badge l6" onclick="selectLevel(this, 'static/images/apple.png')">Apple 🍎</button>
-            <button class="level-badge l7" onclick="selectLevel(this, 'static/images/circle.png')">Circle ⭕</button>
-            <button class="level-badge l8" onclick="selectLevel(this, 'static/images/simple.png')">Simple 🟢</button>
-        </div>
+            <div class="levels">
+                <button class="level-badge l1 active" onclick="selectLevel(this, 'static/images/moon.png')">Moon 🌙</button>
+                <button class="level-badge l2" onclick="selectLevel(this, 'static/images/umbrella.png')">Umbrella ☂️</button>
+                <button class="level-badge l3" onclick="selectLevel(this, 'static/images/square.png')">Square 🔲</button>
+                <button class="level-badge l4" onclick="selectLevel(this, 'static/images/star.png')">Star ⭐</button>
+                <button class="level-badge l5" onclick="selectLevel(this, 'static/images/egg.png')">Egg 🥚</button>
+                <button class="level-badge l6" onclick="selectLevel(this, 'static/images/apple.png')">Apple 🍎</button>
+                <button class="level-badge l7" onclick="selectLevel(this, 'static/images/circle.png')">Circle ⭕</button>
+                <button class="level-badge l8" onclick="selectLevel(this, 'static/images/simple.png')">Simple 🟢</button>
+            </div>
 
-        <div class="how-to">👋 How to Play</div>
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="icon-btn">🟢</div>
+                    <h3>Start</h3>
+                    <p>Point index finger to start</p>
+                </div>
+                <div class="card">
+                    <div class="icon-btn">👆</div>
+                    <h3>Move</h3>
+                    <p>Guide pointer inside path</p>
+                </div>
+                <div class="card">
+                    <div class="icon-btn">⚠️</div>
+                    <h3>Avoid Walls</h3>
+                    <p>Hitting lines triggers reset</p>
+                </div>
+                <div class="card">
+                    <div class="icon-btn">🏁</div>
+                    <h3>Finish</h3>
+                    <p>Reach END to win</p>
+                </div>
+            </div>
 
-        <div class="cards-grid">
-            <div class="card c-start">
-                <div class="icon-btn">🟢</div>
-                <h3>Start</h3>
-                <p>Touch START with index finger</p>
+            <div class="camera-notice">
+                <strong>📷 Camera Access Needed:</strong> MazeQuest runs MediaPipe hand tracking locally inside your browser. Tap <strong>Allow</strong> when requested.
             </div>
-            <div class="card c-move">
-                <div class="icon-btn">👆</div>
-                <h3>Move</h3>
-                <p>Guide green dot through path</p>
-            </div>
-            <div class="card c-wall">
-                <div class="icon-btn">⚠️</div>
-                <h3>Avoid Walls</h3>
-                <p>Hitting walls triggers restart</p>
-            </div>
-            <div class="card c-finish">
-                <div class="icon-btn">🏁</div>
-                <h3>Finish</h3>
-                <p>Reach END to win the game</p>
-            </div>
-        </div>
-
-        <div class="camera-notice">
-            <strong>📷 Camera Access Needed</strong><br>
-            MazeQuest needs your camera to track your hand. Tap <strong>Start Playing</strong> and hit <strong>Allow</strong> when prompted.<br>
-            🔒 Your camera feed stays local on your phone.
         </div>
 
         <button class="start-btn" onclick="startGame()">🚀 Start Playing!</button>
@@ -75,9 +71,9 @@
 
     <div id="game-screen">
         <div class="controls-bar">
-            <button class="back-btn" onclick="goHome()">🏠 Back to Home</button>
+            <button class="back-btn" onclick="goHome()">🏠 Home</button>
             <div class="timer-badge" id="timer-display">⏱️ Time: 0.0s</div>
-            <button class="reset-btn" onclick="resetGame()">🔄 Try Again</button>
+            <button class="reset-btn" onclick="resetGame()">🔄 Retry</button>
         </div>
         <div class="canvas-wrapper">
             <video id="input-video" autoplay playsinline webkit-playsinline muted style="display:none;"></video>
@@ -85,7 +81,6 @@
         </div>
     </div>
 
-    <!-- Link external JS -->
     <script src="static/script.js"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@ const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const videoElement = document.getElementById('input-video');
 
+// Off-screen canvas for collision and transparent line rendering
 const offCanvas = document.createElement('canvas');
 offCanvas.width = 1000;
 offCanvas.height = 750;
@@ -9,7 +10,7 @@ const offCtx = offCanvas.getContext('2d');
 
 let fingerTip = null;
 let smoothPos = null;
-const smoothingFactor = 0.2;
+const smoothingFactor = 0.25;
 
 let isDrawing = false; 
 let pathPoints = [];
@@ -21,13 +22,14 @@ let audioCtx = null;
 let startTime = 0;
 let elapsedTime = 0;
 
-let selectedImagePath = "/static/images/moon.png";
+let selectedImagePath = "static/images/moon.png";
 let mazeImg = new Image();
 let isImageLoaded = false;
 
-function selectLevel(element) {
+function selectLevel(element, imagePath) {
     document.querySelectorAll('.level-badge').forEach(badge => badge.classList.remove('active'));
     element.classList.add('active');
+    selectedImagePath = imagePath;
     loadSelectedMazeImage();
 }
 
@@ -42,15 +44,15 @@ function playSound(type) {
 
     if (type === 'hit') {
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.3);
     } else if (type === 'win') {
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.3);
+        osc.frequency.setValueAtTime(587, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.35);
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
         osc.start();
@@ -58,73 +60,61 @@ function playSound(type) {
     }
 }
 
-function generateRandomMaze(rows, cols) {
-    const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({
-        visited: false,
-        walls: { top: true, right: true, bottom: true, left: true }
-    })));
-
-    function visit(r, c) {
-        grid[r][c].visited = true;
-        const neighbors = [
-            [r - 1, c, 'top', 'bottom'],
-            [r + 1, c, 'bottom', 'top'],
-            [r, c - 1, 'left', 'right'],
-            [r, c + 1, 'right', 'left']
-        ].sort(() => Math.random() - 0.5);
-
-        for (const [nr, nc, dir, opp] of neighbors) {
-            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !grid[nr][nc].visited) {
-                grid[r][c].walls[dir] = false;
-                grid[nr][nc].walls[opp] = false;
-                visit(nr, nc);
-            }
-        }
-    }
-
-    visit(0, 0);
-    return grid;
-}
-
+// Loads the selected PNG, strips all white background pixels, and turns walls into glowing cyan
 function loadSelectedMazeImage() {
     isImageLoaded = false;
-    offCtx.clearRect(0, 0, 1000, 750);
+    mazeImg = new Image();
+    mazeImg.crossOrigin = "anonymous";
+    mazeImg.onload = () => {
+        offCtx.clearRect(0, 0, 1000, 750);
 
-    const rows = 10;
-    const cols = 12;
-    const startX = 100;
-    const startY = 75;
-    const width = 800;
-    const height = 600;
-    const cellW = width / cols;
-    const cellH = height / rows;
-
-    const maze = generateRandomMaze(rows, cols);
-
-    offCtx.strokeStyle = "#000000";
-    offCtx.lineWidth = 12;
-
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            const x = startX + c * cellW;
-            const y = startY + r * cellH;
-            const cell = maze[r][c];
-
-            offCtx.beginPath();
-            if (cell.walls.top) { offCtx.moveTo(x, y); offCtx.lineTo(x + cellW, y); }
-            if (cell.walls.right) { offCtx.moveTo(x + cellW, y); offCtx.lineTo(x + cellW, y + cellH); }
-            if (cell.walls.bottom) { offCtx.moveTo(x, y + cellH); offCtx.lineTo(x + cellW, y + cellH); }
-            if (cell.walls.left) { offCtx.moveTo(x, y); offCtx.lineTo(x, y + cellH); }
-            offCtx.stroke();
+        // Maintain aspect ratio and center image
+        const aspect = mazeImg.width / mazeImg.height;
+        let drawW = 680;
+        let drawH = drawW / aspect;
+        if (drawH > 600) {
+            drawH = 600;
+            drawW = drawH * aspect;
         }
-    }
+        const drawX = (1000 - drawW) / 2;
+        const drawY = (750 - drawH) / 2;
 
-    isImageLoaded = true;
+        offCtx.drawImage(mazeImg, drawX, drawY, drawW, drawH);
+
+        // Pixel processing: Filter out white pixels to make them transparent
+        const imgData = offCtx.getImageData(0, 0, 1000, 750);
+        const data = imgData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // If pixel is white or light grey (background), make it 100% transparent
+            if (r > 170 && g > 170 && b > 170) {
+                data[i + 3] = 0;
+            } else if (data[i + 3] > 80) {
+                // If pixel is dark wall line, convert to glowing neon cyan
+                data[i] = 0;       // R
+                data[i + 1] = 240; // G
+                data[i + 2] = 255; // B
+                data[i + 3] = 255; // Alpha
+            }
+        }
+
+        offCtx.putImageData(imgData, 0, 0);
+        isImageLoaded = true;
+    };
+    mazeImg.src = selectedImagePath;
 }
+
+// Initial trigger
+loadSelectedMazeImage();
 
 function startGame() {
     document.getElementById('home-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'block';
+    const gameScreen = document.getElementById('game-screen');
+    gameScreen.style.display = 'flex';
 
     loadSelectedMazeImage();
     resetGame();
@@ -136,9 +126,9 @@ function startGame() {
 
         hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
+            modelComplexity: 0,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
         hands.onResults(onResults);
@@ -147,10 +137,13 @@ function startGame() {
             onFrame: async () => {
                 await hands.send({ image: videoElement });
             },
-            width: 1000,
-            height: 750
+            width: 640,
+            height: 480,
+            facingMode: 'user'
         });
-        camera.start();
+        camera.start().catch(err => {
+            alert("Camera access denied or unavailable: " + err);
+        });
     }
 }
 
@@ -162,14 +155,11 @@ function resetGame() {
     startTime = Date.now();
     elapsedTime = 0;
     document.getElementById('timer-display').innerText = "⏱️ Time: 0.0s";
-    
-    // Generate a fresh random layout on reset
-    loadSelectedMazeImage();
 }
 
 function goHome() {
     document.getElementById('game-screen').style.display = 'none';
-    document.getElementById('home-screen').style.display = 'block';
+    document.getElementById('home-screen').style.display = 'flex';
 }
 
 function checkCollision(pt) {
@@ -181,12 +171,13 @@ function checkCollision(pt) {
     if (px < 0 || px >= 1000 || py < 0 || py >= 750) return false;
     
     const pixel = offCtx.getImageData(px, py, 1, 1).data;
-    return (pixel[0] < 80 && pixel[1] < 80 && pixel[2] < 80 && pixel[3] > 100);
+    // Any non-transparent pixel on offCanvas is a wall
+    return (pixel[3] > 180);
 }
 
 function checkWin(pt) {
     if (!pt) return false;
-    return (pt.x > 840 && pt.y < 140);
+    return (pt.x > 840 && pt.y < 160);
 }
 
 function onResults(results) {
@@ -198,26 +189,30 @@ function onResults(results) {
         document.getElementById('timer-display').innerText = `⏱️ Time: ${elapsedTime}s`;
     }
 
-    // 1. Draw Video
+    // 1. Draw Mirrored Camera Background
     ctx.scale(-1, 1);
     ctx.translate(-canvas.width, 0);
     ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // 2. Draw Glowing Walls Only
+    // 2. Dark tint overlay
+    ctx.fillStyle = "rgba(5, 7, 13, 0.5)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 3. Draw Transparent Cyan Maze Lines
     if (isImageLoaded) {
         ctx.save();
-        ctx.shadowColor = "#00FFFF";
-        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00f0ff";
+        ctx.shadowBlur = 12;
         ctx.drawImage(offCanvas, 0, 0);
         ctx.restore();
     }
 
-    // 3. Clear Start & End Zone Markers (Top Corners)
+    // 4. Start & End Markers
     ctx.save();
     ctx.fillStyle = "#00FF66";
     ctx.shadowColor = "#00FF66";
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.arc(130, 110, 18, 0, 2 * Math.PI);
     ctx.fill();
@@ -227,7 +222,7 @@ function onResults(results) {
 
     ctx.fillStyle = "#FF0055";
     ctx.shadowColor = "#FF0055";
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.arc(870, 110, 18, 0, 2 * Math.PI);
     ctx.fill();
@@ -236,7 +231,7 @@ function onResults(results) {
     ctx.fillText("END 🏁", 852, 114);
     ctx.restore();
 
-    // 4. Tracking & Smoothing
+    // 5. Tracking & Point Detection
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
         const indexTip = landmarks[8];
@@ -275,19 +270,19 @@ function onResults(results) {
             isDrawing = false;
         }
 
-        ctx.fillStyle = isDrawing ? "#00FF00" : "#FFA500";
+        ctx.fillStyle = isDrawing ? "#00FF66" : "#00f0ff";
         ctx.beginPath();
-        ctx.arc(fingerTip.x, fingerTip.y, 8, 0, 2 * Math.PI);
+        ctx.arc(fingerTip.x, fingerTip.y, 9, 0, 2 * Math.PI);
         ctx.fill();
     } else {
         smoothPos = null;
     }
 
-    // 5. Draw Neon Player Path
+    // 6. Draw Player Trail
     if (pathPoints.length > 1) {
         ctx.save();
-        ctx.strokeStyle = "#FF0055";
-        ctx.shadowColor = "#FF0055";
+        ctx.strokeStyle = "#ff0055";
+        ctx.shadowColor = "#ff0055";
         ctx.shadowBlur = 10;
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -299,22 +294,22 @@ function onResults(results) {
         ctx.restore();
     }
 
-    // 6. Popups
+    // 7. Popups
     if (gameOver) {
-        ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
+        ctx.fillStyle = "rgba(255, 0, 0, 0.7)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 36px Arial";
-        ctx.fillText("WALL HIT!", 320, 280);
+        ctx.font = "bold 38px Arial";
+        ctx.fillText("WALL HIT!", 410, 360);
         ctx.font = "20px Arial";
-        ctx.fillText("Click 'Try Again' above to restart", 260, 330);
+        ctx.fillText("Tap Retry above to play again", 370, 410);
     } else if (gameWon) {
-        ctx.fillStyle = "rgba(0, 255, 100, 0.7)";
+        ctx.fillStyle = "rgba(0, 255, 100, 0.75)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#FFFFFF";
         ctx.font = "bold 42px Arial";
-        ctx.fillText("GAME COMPLETED!", 210, 260);
+        ctx.fillText("GAME COMPLETED!", 300, 360);
         ctx.font = "24px Arial";
-        ctx.fillText(`Clean Run! Time: ${elapsedTime}s 🎉`, 270, 310);
+        ctx.fillText(`Time: ${elapsedTime}s 🎉`, 430, 410);
     }
 }
